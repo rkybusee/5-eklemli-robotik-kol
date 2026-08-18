@@ -1,0 +1,37 @@
+# Python ortamı ve önbellek
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Kalibrasyon ve Görüntü İşleme
+kalibrasyon/camPhotos/
+kalibrasyon/calibration_result.yaml
+kalibrasyon/homography.yaml
+*.png
+*.jpg
+*.jpeg
+
+# Derleme ve Çalıştırılabilir Dosyalar
+arduino_cli/
+*.exe
+*.hex
+*.elf
+*.bin
+
+# Loglar ve Geçici Dosyalar
+*.log
+kalibrasyon_log.md
+
+# IDE ve İşletim Sistemi
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+.gemini/
+.antigravityignore
