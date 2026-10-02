@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sanal Robot Kol Kontrolü</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #e2e8f0;
+        }
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+            margin-top: 10px;
+            margin-bottom: 10px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 24px;
+            width: 24px;
+            border-radius: 50%;
+            background: #ffffff;
+            border: 3px solid currentColor;
+            cursor: pointer;
+            margin-top: -10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            transition: transform 0.1s;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        input[type=range]:focus {
+            outline: none;
+        }
+        .slider-purple::-webkit-slider-thumb { border-color: #a855f7; }
+        .slider-purple::-webkit-slider-runnable-track { background: #e9d5ff; border: 1px solid #d8b4fe; height: 8px;}
+
+        .slider-blue::-webkit-slider-thumb { border-color: #3b82f6; }
+        .slider-blue::-webkit-slider-runnable-track { background: #bfdbfe; border: 1px solid #93c5fd; height: 8px;}
+
+        .slider-green::-webkit-slider-thumb { border-color: #22c55e; }
+        .slider-green::-webkit-slider-runnable-track { background: #bbf7d0; border: 1px solid #86efac; height: 8px;}
+
+        .slider-yellow::-webkit-slider-thumb { border-color: #eab308; }
+        .slider-yellow::-webkit-slider-runnable-track { background: #fef08a; border: 1px solid #fde047; height: 8px;}
+
+        .slider-red::-webkit-slider-thumb { border-color: #ef4444; }
+        .slider-red::-webkit-slider-runnable-track { background: #fecaca; border: 1px solid #f87171; height: 8px;}
+
+        .slider-cyan::-webkit-slider-thumb { border-color: #06b6d4; }
+        .slider-cyan::-webkit-slider-runnable-track { background: #cffafe; border: 1px solid #67e8f9; height: 8px;}
+
+        /* Spline animasyonu */
+        @keyframes spline-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .spline-active {
+            animation: spline-pulse 1.5s ease-in-out infinite;
+        }
+
+        /* Toggle switch */
+        .toggle-switch {
+            position: relative;
+            width: 48px;
+            height: 26px;
+            background: #cbd5e1;
+            border-radius: 13px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .toggle-switch.active {
+            background: #06b6d4;
+        }
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .toggle-switch.active::after {
+            transform: translateX(22px);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-4xl p-6 md:p-8 flex flex-col gap-8 border border-gray-100">
+
+        <div class="flex flex-col items-center">
+            <h1 class="text-3xl font-extrabold text-gray-800 mb-2 tracking-tight">Robot Kol Kontrol Merkezi</h1>
+            <div class="flex items-center gap-2 mb-6">
+                <span id="baglanti_noktasi" class="w-2 h-2 rounded-full bg-gray-400"></span>
+                <p id="baglanti_metni" class="text-sm text-gray-500 text-center font-medium">Bağlantı kontrol ediliyor...</p>
+            </div>
+
+            <div class="relative bg-slate-900 rounded-2xl overflow-hidden shadow-[inset_0_4px_20px_rgba(0,0,0,0.5)] w-full flex justify-center border-4 border-slate-800">
+                <canvas id="robotCanvas" width="800" height="450" class="w-full h-auto block max-h-[500px]"></canvas>
+                <div class="absolute top-4 left-4 bg-black/50 text-white/80 px-3 py-1 rounded-full text-xs font-mono backdrop-blur-sm">
+                    Simülasyon Aktif
+                </div>
+                <div id="spline_badge" class="absolute top-4 right-4 bg-cyan-500/80 text-white px-3 py-1 rounded-full text-xs font-mono backdrop-blur-sm flex items-center gap-1.5 transition-all duration-300">
+                    <span class="w-1.5 h-1.5 bg-white rounded-full spline-active"></span>
+                    Spline Aktif
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+
+            <div class="bg-purple-50 rounded-2xl p-5 shadow-sm border border-purple-100 flex flex-col justify-between transition-shadow hover:shadow-md">
+                <div class="flex justify-between items-center mb-3">
+                    <label class="font-bold text-purple-900 flex items-center gap-2 text-sm uppercase tracking-wider">
+                        <span class="w-2.5 h-2.5 rounded-full bg-purple-500 block shadow-[0_0_8px_rgba(168,85,247,0.8)]"></span> Taban (Base)
+                    </label>
+                    <span id="val_taban" class="font-mono bg-white text-purple-700 px-2 py-1 rounded-md text-sm font-bold shadow-sm border border-purple-100">90°</span>
+                </div>
+                <input type="range" id="taban" min="0" max="180" value="90" class="slider-purple">
+                <div class="flex justify-between text-xs text-purple-400 font-medium mt-1"><span>0°</span><span>180°</span></div>
+            </div>
+
+            <div class="bg-blue-50 rounded-2xl p-5 shadow-sm border border-blue-100 flex flex-col justify-between transition-shadow hover:shadow-md">
+                <div class="flex justify-between items-center mb-3">
+                    <label class="font-bold text-blue-900 flex items-center gap-2 text-sm uppercase tracking-wider">
+                        <span class="w-2.5 h-2.5 rounded-full bg-blue-500 block shadow-[0_0_8px_rgba(59,130,246,0.8)]"></span> Omuz (Shoulder)
+                    </label>
+                    <span id="val_omuz" class="font-mono bg-white text-blue-700 px-2 py-1 rounded-md text-sm font-bold shadow-sm border border-blue-100">90°</span>
+                </div>
+                <input type="range" id="omuz" min="0" max="180" value="90" class="slider-blue">
+                <div class="flex justify-between text-xs text-blue-400 font-medium mt-1"><span>0°</span><span>180°</span></div>
+            </div>
+
+            <div class="bg-green-50 rounded-2xl p-5 shadow-sm border border-green-100 flex flex-col justify-between transition-shadow hover:shadow-md">
+                <div class="flex justify-between items-center mb-3">
+                    <label class="font-bold text-green-900 flex items-center gap-2 text-sm uppercase tracking-wider">
+                        <span class="w-2.5 h-2.5 rounded-full bg-green-500 block shadow-[0_0_8px_rgba(34,197,94,0.8)]"></span> Dirsek (Elbow)
+                    </label>
+                    <span id="val_dirsek" class="font-mono bg-white text-green-700 px-2 py-1 rounded-md text-sm font-bold shadow-sm border border-green-100">90°</span>
+                </div>
+                <input type="range" id="dirsek" min="0" max="180" value="90" class="slider-green">
+                <div class="flex justify-between text-xs text-green-400 font-medium mt-1"><span>0°</span><span>180°</span></div>
+            </div>
+
+            <div class="bg-yellow-50 rounded-2xl p-5 shadow-sm border border-yellow-100 flex flex-col justify-between transition-shadow hover:shadow-md">
+                <div class="flex justify-between items-center mb-3">
+                    <label class="font-bold text-yellow-900 flex items-center gap-2 text-sm uppercase tracking-wider">
+                        <span class="w-2.5 h-2.5 rounded-full bg-yellow-500 block shadow-[0_0_8px_rgba(234,179,8,0.8)]"></span> Bilek (Wrist)
+                    </label>
+                    <span id="val_bilek" class="font-mono bg-white text-yellow-700 px-2 py-1 rounded-md text-sm font-bold shadow-sm border border-yellow-100">90°</span>
+                </div>
+                <input type="range" id="bilek" min="0" max="180" value="90" class="slider-yellow">
+                <div class="flex justify-between text-xs text-yellow-400 font-medium mt-1"><span>0°</span><span>180°</span></div>
+            </div>
+
+            <div class="bg-red-50 rounded-2xl p-5 shadow-sm border border-red-100 flex flex-col justify-between transition-shadow hover:shadow-md">
+                <div class="flex justify-between items-center mb-3">
+                    <label class="font-bold text-red-900 flex items-center gap-2 text-sm uppercase tracking-wider">
+                        <span class="w-2.5 h-2.5 rounded-full bg-red-500 block shadow-[0_0_8px_rgba(239,68,68,0.8)]"></span> Tutucu (Gripper)
+                    </label>
+                    <span id="val_tutucu" class="font-mono bg-white text-red-700 px-2 py-1 rounded-md text-sm font-bold shadow-sm border border-red-100">0°</span>
+                </div>
+                <input type="range" id="tutucu" min="0" max="180" value="0" class="slider-red">
+                <div class="flex justify-between text-xs text-red-400 font-medium mt-1 mb-2"><span>0°</span><span>180°</span></div>
+                <button onclick="saveGripperAngle()" class="w-full bg-red-500 hover:bg-red-600 text-white font-semibold py-1.5 px-3 rounded-lg text-sm transition-colors shadow-sm active:scale-95 flex items-center justify-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+                    Kavrama Açısını Kaydet
+                </button>
+            </div>
+
+        </div>
+
+        <div class="mt-4 bg-slate-50 rounded-2xl p-6 border border-slate-200 shadow-sm">
+            <div class="flex justify-between items-start mb-6">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-800">İleri Kinematik Sonucu</h2>
+                    <p class="text-sm text-slate-500 mt-1 font-medium">Robot uç noktasının taban koordinat sistemine göre konumu</p>
+                </div>
+                <span class="bg-emerald-100 text-emerald-700 font-bold px-3 py-1 rounded-full text-xs border border-emerald-200 flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+                    Güncel
+                </span>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+
+                <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">X</span>
+                    <div class="text-2xl font-black text-slate-800 tracking-tight" id="fk_x">0.00</div>
+                    <span class="text-xs font-medium text-slate-400 block mt-1">mm</span>
+                </div>
+
+                <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Y</span>
+                    <div class="text-2xl font-black text-slate-800 tracking-tight" id="fk_y">0.00</div>
+                    <span class="text-xs font-medium text-slate-400 block mt-1">mm</span>
+                </div>
+
+                <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Z</span>
+                    <div class="text-2xl font-black text-slate-800 tracking-tight" id="fk_z">0.00</div>
+                    <span class="text-xs font-medium text-slate-400 block mt-1">mm</span>
+                </div>
+
+                <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">PHİ (Roll)</span>
+                    <div class="text-2xl font-black text-slate-800 tracking-tight"><span id="fk_phi">0.00</span>°</div>
+                    <span class="text-xs font-medium text-slate-400 block mt-1">derece</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Kübik Spline Ayarları Paneli -->
+        <div class="mt-0 bg-gradient-to-br from-cyan-50 to-sky-50 rounded-2xl p-6 border border-cyan-200 shadow-sm">
+            <div class="flex justify-between items-start mb-5">
+                <div>
+                    <h2 class="text-xl font-bold text-cyan-900 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-cyan-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        Kübik Spline Yörünge Ayarları
+                    </h2>
+                    <p class="text-sm text-cyan-600 mt-1 font-medium">Motorların yumuşak ivmelenme/yavaşlama profili</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span id="spline_status_text" class="text-xs font-bold text-cyan-700 uppercase">Aktif</span>
+                    <div id="spline_toggle" class="toggle-switch active" onclick="toggleSpline()"></div>
+                </div>
+            </div>
+
+            <div id="spline_settings" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="bg-white/70 backdrop-blur rounded-xl p-4 border border-cyan-100">
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="font-bold text-cyan-800 text-sm">Geçiş Süresi (Baz)</label>
+                        <span id="val_spline_sure" class="font-mono bg-cyan-100 text-cyan-700 px-2 py-0.5 rounded text-sm font-bold">0.50s</span>
+                    </div>
+                    <input type="range" id="spline_sure" min="10" max="250" value="50" class="slider-cyan" step="5">
+                    <div class="flex justify-between text-xs text-cyan-400 font-medium mt-1"><span>0.1s</span><span>2.5s</span></div>
+                    <p class="text-xs text-cyan-500 mt-2">Küçük hareketler için baz süre. Büyük hareketlerde otomatik uzar.</p>
+                </div>
+
+                <div class="bg-white/70 backdrop-blur rounded-xl p-4 border border-cyan-100">
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="font-bold text-cyan-800 text-sm">Adım/Saniye (FPS)</label>
+                        <span id="val_spline_fps" class="font-mono bg-cyan-100 text-cyan-700 px-2 py-0.5 rounded text-sm font-bold">30</span>
+                    </div>
+                    <input type="range" id="spline_fps" min="10" max="60" value="30" class="slider-cyan" step="5">
+                    <div class="flex justify-between text-xs text-cyan-400 font-medium mt-1"><span>10</span><span>60</span></div>
+                    <p class="text-xs text-cyan-500 mt-2">Yüksek FPS = daha yumuşak hareket, daha fazla seri port trafiği.</p>
+                </div>
+            </div>
+
+            <!-- Spline Görsel Açıklama -->
+            <div id="spline_visual" class="mt-4 bg-white/50 backdrop-blur rounded-xl p-4 border border-cyan-100">
+                <div class="flex items-center gap-3 mb-3">
+                    <span class="text-sm font-bold text-cyan-800">Hız Profili:</span>
+                    <span class="text-xs text-cyan-600 font-medium">Başlangıç hızı 0 → İvmelenme → Sabit → Yavaşlama → Bitiş hızı 0</span>
+                </div>
+                <div class="relative h-12 bg-gradient-to-r from-cyan-100 via-cyan-300 to-cyan-100 rounded-lg overflow-hidden">
+                    <svg viewBox="0 0 200 40" class="w-full h-full" preserveAspectRatio="none">
+                        <!-- Kübik spline eğrisi: 3t² - 2t³ türevi = 6t - 6t² = 6t(1-t) -->
+                        <path d="M 0,38 C 30,38 50,4 100,4 C 150,4 170,38 200,38" fill="none" stroke="#0891b2" stroke-width="2.5" stroke-linecap="round"/>
+                        <!-- Başlangıç noktası -->
+                        <circle cx="0" cy="38" r="4" fill="#06b6d4"/>
+                        <!-- Tepe noktası -->
+                        <circle cx="100" cy="4" r="4" fill="#06b6d4"/>
+                        <!-- Bitiş noktası -->
+                        <circle cx="200" cy="38" r="4" fill="#06b6d4"/>
+                    </svg>
+                    <div class="absolute bottom-0 left-0 right-0 flex justify-between px-2 text-[10px] font-bold text-cyan-700">
+                        <span>v=0</span>
+                        <span>v=max</span>
+                        <span>v=0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const canvas = document.getElementById('robotCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const s_taban = document.getElementById('taban');
+        const s_omuz = document.getElementById('omuz');
+        const s_dirsek = document.getElementById('dirsek');
+        const s_bilek = document.getElementById('bilek');
+        const s_tutucu = document.getElementById('tutucu');
+
+        const v_taban = document.getElementById('val_taban');
+        const v_omuz = document.getElementById('val_omuz');
+        const v_dirsek = document.getElementById('val_dirsek');
+        const v_bilek = document.getElementById('val_bilek');
+        const v_tutucu = document.getElementById('val_tutucu');
+
+        const baglanti_noktasi = document.getElementById('baglanti_noktasi');
+        const baglanti_metni = document.getElementById('baglanti_metni');
+
+        const ui_fk_x = document.getElementById('fk_x');
+        const ui_fk_y = document.getElementById('fk_y');
+        const ui_fk_z = document.getElementById('fk_z');
+        const ui_fk_phi = document.getElementById('fk_phi');
+
+        // Spline UI elemanları
+        const spline_badge = document.getElementById('spline_badge');
+        const spline_toggle = document.getElementById('spline_toggle');
+        const spline_status_text = document.getElementById('spline_status_text');
+        const spline_settings = document.getElementById('spline_settings');
+        const spline_visual = document.getElementById('spline_visual');
+        const s_spline_sure = document.getElementById('spline_sure');
+        const s_spline_fps = document.getElementById('spline_fps');
+        const v_spline_sure = document.getElementById('val_spline_sure');
+        const v_spline_fps = document.getElementById('val_spline_fps');
+
+        let splineAktif = true;
+
+        const L0 = 90, L1 = 120, L2 = 100, L3 = 60; // 2D çizim için sembolik uzunluklar
+
+        // Gerçek Fiziksel Uzunluklar (İleri kinematik hesaplaması için, mm cinsinden)
+        const L1_mm = 230.0;
+        const L2_mm = 230.0;
+        const L3_mm = 110.0;
+        const H_mm = 95.0;
+
+        const originX = canvas.width / 2;
+        const originY = canvas.height - 60;
+
+        function radians(degrees) {
+            return degrees * (Math.PI / 180);
+        }
+
+        function updateForwardKinematics(j1, j2, j3, j4) {
+            let j1_rad = radians(j1);
+
+            // J2 (Omuz): 90° = dik yukarı, 0° = yatay ileri
+            let r1_fk = L1_mm * Math.cos(radians(j2));
+            let z1_fk = L1_mm * Math.sin(radians(j2));
+
+            // J3 (Dirsek - paralel linkage): 90° → yatay, 180° → dik yukarı, 0° → dik aşağı
+            let q2_abs_fk = radians(j3 - 90);
+            let r2_fk = L2_mm * Math.cos(q2_abs_fk);
+            let z2_fk = L2_mm * Math.sin(q2_abs_fk);
+
+            // L3 (bilek+tutucu) q2_abs açısında devam eder
+            let r_total = r1_fk + r2_fk + L3_mm * Math.cos(q2_abs_fk);
+            let z_total = H_mm + z1_fk + z2_fk + L3_mm * Math.sin(q2_abs_fk);
+
+            let x_tip = r_total * Math.cos(j1_rad);
+            let y_tip = r_total * Math.sin(j1_rad);
+
+            ui_fk_x.innerText = x_tip.toFixed(2);
+            ui_fk_y.innerText = y_tip.toFixed(2);
+            ui_fk_z.innerText = z_total.toFixed(2);
+            ui_fk_phi.innerText = parseFloat(j4).toFixed(2);
+        }
+
+        function drawRobot() {
+            ctx.fillStyle = "#0f172a";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            let deg0 = parseFloat(s_taban.value);
+            let deg1 = parseFloat(s_omuz.value);
+            let deg2 = parseFloat(s_dirsek.value);
+            let deg3 = parseFloat(s_bilek.value);
+
+            let baseAngle = radians(deg0); // 0=önden sol(+X), 90=ileri(+Y), 180=önden sağ(-X)
+            let tilt = 0.4;
+
+            // Servo 90° = dik yukarı (Canvas'ta -PI/2), 0° = yatay ileri, 180° = yatay geri
+            // Canvas Y ekseni aşağı doğru artar, bu yüzden (90 - deg) dönüşümü gerekli
+            let a1 = radians(90 - deg1);  // J2: 90°=düz yukarı, 0°=yatay ileri
+
+            // Paralel linkage (J3): L2'nin DÜNYAYA GÖRE mutlak açısını kontrol eder
+            // J3=90° → L2 yatay ileri, J3=180° → L2 dik yukarı, J3=0° → L2 dik aşağı
+            let q2_abs_deg = 90 - deg2; // Servo 90°=yatay, 180°=yukarı, 0°=aşağı
+            let a2 = radians(q2_abs_deg);
+            // Bilek (J4) roll ekseni – pitch açısını değiştirmez, a2 ile aynı kalır
+            let a3 = a2;
+
+            updateForwardKinematics(deg0, deg1, deg2, deg3); // Anlık XYZ hesapla ve yazdır
+
+            let r0 = 0;
+            let y0 = originY - L0;
+
+            // L1: omuz ekseninden çıkan segment
+            let r1 = r0 + L1 * Math.cos(a1);
+            let y1 = y0 - L1 * Math.sin(a1);
+
+            // L2: paralel linkage – L1'in UCUndan değil, DÜNYA koordinatında a2 açısında
+            let r2 = r1 + L2 * Math.cos(a2);
+            let y2 = y1 - L2 * Math.sin(a2);
+
+            // L3: bilek/tutucu – a2 ile aynı açıda yatay devam eder
+            let r3 = r2 + L3 * Math.cos(a2);
+            let y3 = y2 - L3 * Math.sin(a2);
+
+            let final_x0 = originX, final_y0 = y0;
+            let final_x1 = originX + r1 * Math.cos(baseAngle), final_y1 = y1 + r1 * Math.sin(baseAngle) * tilt;
+            let final_x2 = originX + r2 * Math.cos(baseAngle), final_y2 = y2 + r2 * Math.sin(baseAngle) * tilt;
+            let final_x3 = originX + r3 * Math.cos(baseAngle), final_y3 = y3 + r3 * Math.sin(baseAngle) * tilt;
+
+            ctx.strokeStyle = "#1e293b";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.ellipse(originX, originY, 200, 200 * tilt, 0, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.ellipse(originX, originY, 100, 100 * tilt, 0, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.fillStyle = "#334155";
+            ctx.beginPath();
+            ctx.ellipse(originX, originY, 60, 60 * tilt, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = "#475569";
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            let baseGrad = ctx.createLinearGradient(originX - 25, 0, originX + 25, 0);
+            baseGrad.addColorStop(0, "#475569");
+            baseGrad.addColorStop(0.5, "#94a3b8");
+            baseGrad.addColorStop(1, "#334155");
+            ctx.fillStyle = baseGrad;
+            ctx.fillRect(originX - 25, final_y0, 50, L0);
+
+            ctx.beginPath();
+            ctx.ellipse(originX, originY, 25, 25 * tilt, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(final_x0, final_y0);
+            ctx.lineTo(final_x1, final_y1);
+            ctx.lineTo(final_x2, final_y2);
+            ctx.lineTo(final_x3, final_y3);
+            ctx.strokeStyle = "#cbd5e1";
+            ctx.lineWidth = 18;
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(final_x0, final_y0);
+            ctx.lineTo(final_x1, final_y1);
+            ctx.lineTo(final_x2, final_y2);
+            ctx.lineTo(final_x3, final_y3);
+            ctx.strokeStyle = "#f8fafc";
+            ctx.lineWidth = 6;
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+            ctx.stroke();
+
+            const joints = [
+                {x: originX, y: originY, color: "#a855f7", isBase: true},
+                {x: final_x0, y: final_y0, color: "#3b82f6", isBase: false},
+                {x: final_x1, y: final_y1, color: "#22c55e", isBase: false},
+                {x: final_x2, y: final_y2, color: "#eab308", isBase: false}
+            ];
+
+            for (let j of joints) {
+                if (j.isBase) {
+                    ctx.fillStyle = j.color;
+                    ctx.beginPath();
+                    ctx.ellipse(j.x, j.y, 40, 40 * tilt, 0, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.strokeStyle = "#ffffff";
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.moveTo(j.x, j.y);
+                    ctx.lineTo(j.x + 40 * Math.cos(baseAngle), j.y + 40 * Math.sin(baseAngle) * tilt);
+                    ctx.stroke();
+
+                    ctx.fillStyle = "#ffffff";
+                    ctx.beginPath();
+                    ctx.ellipse(j.x, j.y, 12, 12 * tilt, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                } else {
+                    ctx.fillStyle = "#1e293b";
+                    ctx.beginPath();
+                    ctx.arc(j.x, j.y, 16, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = j.color;
+                    ctx.beginPath();
+                    ctx.arc(j.x, j.y, 12, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = "#ffffff";
+                    ctx.beginPath();
+                    ctx.arc(j.x, j.y, 5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            // Uç Noktası (Bilek Dönüşü - Roll ve Yeni Gripper Görselleştirmesi)
+            ctx.save();
+            ctx.translate(final_x3, final_y3);
+
+            // J4 (Bilek) açısına göre dönen yapı
+            ctx.rotate(radians(deg3));
+
+            // 1. Resimdeki Mavi Gövde (Altıgen yapı)
+            ctx.fillStyle = "#0284c7"; // Resimdeki parlak mavi
+            ctx.beginPath();
+            ctx.moveTo(-15, -15);
+            ctx.lineTo(15, -15);
+            ctx.lineTo(25, 5);
+            ctx.lineTo(15, 25);
+            ctx.lineTo(-15, 25);
+            ctx.lineTo(-25, 5);
+            ctx.closePath();
+            ctx.fill();
+
+            // Gövde üzerindeki vidalar (süsleme)
+            ctx.fillStyle = "#cbd5e1";
+            for(let pos of [[-10,-5], [10,-5], [-15,10], [15,10], [0,18]]) {
+                ctx.beginPath(); ctx.arc(pos[0], pos[1], 2, 0, Math.PI*2); ctx.fill();
+            }
+
+            // 2. Üzerindeki Mikro Servo Motor (SG90 benzeri mavi/siyah kutu)
+            ctx.fillStyle = "#1e3a8a"; // Koyu mavi yarı saydam kutu
+            ctx.fillRect(-5, 0, 32, 16);
+            ctx.fillStyle = "#0f172a";
+            ctx.beginPath();
+            ctx.arc(4, 8, 4, 0, Math.PI*2); // Servo başlığı (dişli)
+            ctx.fill();
+
+            // J5 (Tutucu) açısını alarak parmakların açıklığını hesapla
+            let tutucuDeg = parseFloat(s_tutucu.value);
+            // 0 derece = tam açık (dışa dönük), büyük açı = kapalı (içe dönük)
+            let fingerAngle = radians(45 - (tutucuDeg * (45/180))); 
+
+            ctx.strokeStyle = "#0284c7"; // Mavi parmaklar
+            ctx.lineWidth = 6;
+            ctx.lineJoin = "round";
+            ctx.lineCap = "round";
+
+            // 3. Sol Parmak
+            ctx.save();
+            ctx.translate(-15, 20); // Sol alt bağlantı noktası
+            ctx.rotate(fingerAngle);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(-18, 25); // Dışa büküm
+            ctx.lineTo(-5, 50);  // İçe büküm (uç)
+            ctx.lineTo(8, 50);   // Tutma yüzeyi
+            ctx.stroke();
+            // Eklem vidası
+            ctx.fillStyle = "#cbd5e1"; ctx.beginPath(); ctx.arc(-18, 25, 2.5, 0, Math.PI*2); ctx.fill();
+            ctx.restore();
+
+            // 4. Sağ Parmak
+            ctx.save();
+            ctx.translate(15, 20); // Sağ alt bağlantı noktası
+            ctx.rotate(-fingerAngle);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(18, 25); // Dışa büküm
+            ctx.lineTo(5, 50);  // İçe büküm (uç)
+            ctx.lineTo(-8, 50); // Tutma yüzeyi
+            ctx.stroke();
+            // Eklem vidası
+            ctx.fillStyle = "#cbd5e1"; ctx.beginPath(); ctx.arc(18, 25, 2.5, 0, Math.PI*2); ctx.fill();
+            ctx.restore();
+
+            ctx.restore();
+
+            ctx.fillStyle = "#94a3b8";
+            ctx.font = "12px monospace";
+            ctx.fillText(`Uç (Rol: ${deg3}°, Kavrama: ${tutucuDeg}°)`, final_x3 + 30, final_y3);
+        }
+
+        // --- Python sunucusuna bağlantı kısmı ---
+        let sendTimeout = null;
+
+        function sendAnglesToServer() {
+            clearTimeout(sendTimeout);
+            // Spline aktifken debounce süresini artır (slider bırakıldığında göndermek için)
+            const debounceMs = splineAktif ? 200 : 120;
+            sendTimeout = setTimeout(() => {
+                fetch('/set_angles', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        taban: parseInt(s_taban.value),
+                        omuz: parseInt(s_omuz.value),
+                        dirsek: parseInt(s_dirsek.value),
+                        bilek: parseInt(s_bilek.value),
+                        tutucu: parseInt(s_tutucu.value)
+                    })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.error) {
+                        setBaglanti(false, data.error);
+                    } else {
+                        if (data.spline_aktif) {
+                            setBaglanti(true, `Spline yörünge: ${data.adim_sayisi} adım`);
+                        } else {
+                            setBaglanti(true, 'Kola bağlı');
+                        }
+                    }
+                })
+                .catch(() => setBaglanti(false, 'Sunucuya ulaşılamıyor'));
+            }, debounceMs);
+        }
+
+        function setBaglanti(ok, mesaj) {
+            baglanti_noktasi.className = 'w-2 h-2 rounded-full ' + (ok ? 'bg-green-500' : 'bg-red-500');
+            baglanti_metni.textContent = mesaj;
+        }
+
+        function saveGripperAngle() {
+            const currentAngle = parseInt(s_tutucu.value);
+            const btn = document.querySelector('button');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = 'Kaydediliyor...';
+
+            fetch('/save_gripper', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ angle: currentAngle })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    btn.innerHTML = '<span class="text-green-200">✔ Kaydedildi</span>';
+                } else {
+                    alert('Hata: ' + data.error);
+                    btn.innerHTML = originalText;
+                }
+                setTimeout(() => { btn.innerHTML = originalText; }, 2000);
+            })
+            .catch(err => {
+                alert('Sunucuya ulaşılamıyor: ' + err);
+                btn.innerHTML = originalText;
+            });
+        }
+
+        function checkStatus() {
+            fetch('/status')
+                .then(res => res.json())
+                .then(data => setBaglanti(data.connected, data.connected ? 'Kola bağlı' : 'Arduino bağlı değil'))
+                .catch(() => setBaglanti(false, 'Sunucuya ulaşılamıyor'));
+        }
+
+        // --- Spline Kontrol Fonksiyonları ---
+        function toggleSpline() {
+            splineAktif = !splineAktif;
+
+            // UI güncelle
+            if (splineAktif) {
+                spline_toggle.classList.add('active');
+                spline_status_text.textContent = 'Aktif';
+                spline_badge.className = 'absolute top-4 right-4 bg-cyan-500/80 text-white px-3 py-1 rounded-full text-xs font-mono backdrop-blur-sm flex items-center gap-1.5 transition-all duration-300';
+                spline_badge.innerHTML = '<span class="w-1.5 h-1.5 bg-white rounded-full spline-active"></span> Spline Aktif';
+                spline_settings.style.opacity = '1';
+                spline_settings.style.pointerEvents = 'auto';
+                spline_visual.style.opacity = '1';
+            } else {
+                spline_toggle.classList.remove('active');
+                spline_status_text.textContent = 'Kapalı';
+                spline_badge.className = 'absolute top-4 right-4 bg-slate-500/60 text-white/70 px-3 py-1 rounded-full text-xs font-mono backdrop-blur-sm flex items-center gap-1.5 transition-all duration-300';
+                spline_badge.innerHTML = '<span class="w-1.5 h-1.5 bg-white/50 rounded-full"></span> Spline Kapalı';
+                spline_settings.style.opacity = '0.5';
+                spline_settings.style.pointerEvents = 'none';
+                spline_visual.style.opacity = '0.5';
+            }
+
+            // Sunucuya bildir
+            fetch('/spline_config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ aktif: splineAktif })
+            });
+        }
+
+        let splineConfigTimeout = null;
+        function updateSplineConfig() {
+            const sureSn = parseInt(s_spline_sure.value) / 100;
+            const fps = parseInt(s_spline_fps.value);
+
+            v_spline_sure.textContent = sureSn.toFixed(2) + 's';
+            v_spline_fps.textContent = fps;
+
+            // Debounce ile sunucuya gönder
+            clearTimeout(splineConfigTimeout);
+            splineConfigTimeout = setTimeout(() => {
+                fetch('/spline_config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sure_sn: sureSn, fps: fps })
+                });
+            }, 300);
+        }
+
+        function loadSplineConfig() {
+            fetch('/spline_config')
+                .then(res => res.json())
+                .then(data => {
+                    splineAktif = data.aktif;
+                    s_spline_sure.value = Math.round(data.sure_sn * 100);
+                    s_spline_fps.value = data.fps;
+                    v_spline_sure.textContent = data.sure_sn.toFixed(2) + 's';
+                    v_spline_fps.textContent = data.fps;
+
+                    // Toggle durumunu güncelle
+                    if (!splineAktif) {
+                        spline_toggle.classList.remove('active');
+                        spline_status_text.textContent = 'Kapalı';
+                        spline_badge.className = 'absolute top-4 right-4 bg-slate-500/60 text-white/70 px-3 py-1 rounded-full text-xs font-mono backdrop-blur-sm flex items-center gap-1.5 transition-all duration-300';
+                        spline_badge.innerHTML = '<span class="w-1.5 h-1.5 bg-white/50 rounded-full"></span> Spline Kapalı';
+                        spline_settings.style.opacity = '0.5';
+                        spline_settings.style.pointerEvents = 'none';
+                        spline_visual.style.opacity = '0.5';
+                    }
+                })
+                .catch(() => {}); // Sunucu kapalıysa sessizce devam et
+        }
+        // --- Bağlantı kısmı bitti ---
+
+        const sliders = [
+            { el: s_taban, val: v_taban },
+            { el: s_omuz, val: v_omuz },
+            { el: s_dirsek, val: v_dirsek },
+            { el: s_bilek, val: v_bilek },
+            { el: s_tutucu, val: v_tutucu }
+        ];
+
+        sliders.forEach(item => {
+            item.el.addEventListener('input', () => {
+                item.val.innerText = item.el.value + '°';
+                drawRobot();
+                sendAnglesToServer();
+            });
+        });
+
+        // Spline ayar sliderları
+        s_spline_sure.addEventListener('input', updateSplineConfig);
+        s_spline_fps.addEventListener('input', updateSplineConfig);
+
+        window.addEventListener('resize', () => {
+            drawRobot();
+        });
+
+        window.onload = () => {
+            drawRobot();
+            checkStatus();
+            loadSplineConfig();
+        };
+    </script>
+</body>
+</html>

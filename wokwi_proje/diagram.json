@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "author": "Anonymous maker",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "wokwi-arduino-uno", "id": "uno", "top": 10.2, "left": -0.6, "attrs": {} },
+    { "type": "wokwi-servo", "id": "servo1", "top": 17.2, "left": 451.2, "attrs": {} },
+    { "type": "wokwi-servo", "id": "servo2", "top": 170.8, "left": 480, "attrs": {} },
+    { "type": "wokwi-servo", "id": "servo3", "top": 276.4, "left": 480, "attrs": {} },
+    { "type": "wokwi-servo", "id": "servo4", "top": 410.8, "left": 480, "attrs": {} }
+  ],
+  "connections": [
+    [ "servo1:GND", "uno:GND.1", "black", [ "h-9.6", "v-67.2", "h-163.2" ] ],
+    [ "servo1:V+", "uno:5V", "green", [ "h-57.6", "v134.5", "h-230.4" ] ],
+    [ "servo1:PWM", "uno:9", "green", [ "h-163.2", "v-105.4", "h-124.8" ] ],
+    [ "uno:6", "servo2:PWM", "red", [ "v-37.8", "h204.7", "v48" ] ],
+    [ "uno:5", "servo3:PWM", "magenta", [ "v-18.6", "h252.8", "v355.2" ] ],
+    [ "servo4:PWM", "uno:3", "cyan", [ "h-134.4", "v-527.8", "h-105.6" ] ],
+    [ "servo2:GND", "uno:GND.2", "black", [ "h-307.2", "v-28.8" ] ],
+    [ "servo3:GND", "uno:GND.3", "black", [ "h0" ] ],
+    [ "servo4:GND", "uno:GND.2", "black", [ "h0" ] ],
+    [ "servo2:V+", "uno:5V", "green", [ "h0" ] ],
+    [ "servo3:V+", "uno:5V", "green", [ "h0" ] ],
+    [ "servo4:V+", "uno:5V", "green", [ "h0" ] ]
+  ],
+  "dependencies": {}
+}
